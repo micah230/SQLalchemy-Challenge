@@ -45,19 +45,18 @@ def welcome():
         "/api/v1.0/precipitation<br/>"
         "/api/v1.0/stations<br/>"
         "/api/v1.0/tobs<br/>"
-        "/api/v1.0/start<br/>"
-        "/api/v1.0/start_end" )
+        "/api/v1.0/<start><br/>"
+        "/api/v1.0/<start>/<end>" )
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
     session = Session(engine)
     end_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
     start_date = dt.datetime.strptime(end_date, '%Y-%m-%d') - dt.timedelta(days=366)
-
     precep_scores = session.query(Measurement.date, Measurement.prcp).\
         filter(Measurement.date >= start_date).\
         filter(Measurement.date <= end_date).all()
-
+    print(precep_scores)
     session.close()
 
     precep_dict = {date: prcp for date, prcp in precep_scores}
@@ -70,6 +69,7 @@ def stations():
     session = Session(engine)
     stations = session.query(Station.station).distinct().all()
     session.close()
+    print(stations)
     station_list = [station[0] for station in stations]
     return jsonify (station_list)
 
@@ -97,17 +97,44 @@ def tobs():
     
     return jsonify(temperatures)
 
-@app.route("/api/v1.0/start")
-def start():
-    """List jthe min, max, and average temperatures calculated from the given start date to the end of the dataset."""
-    return (
-        f"Available Routes:<br/>4" )
+@app.route("/api/v1.0/<start>")
+def start(start):
+    """List the min, max, and average temperatures calculated from the given start date to the end of the dataset."""
+    session = Session(engine)
+    
+    end_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d').date()
+    
+    until_today = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= start_date).\
+        filter(Measurement.date <= end_date).all()
+    
+    session.close()
+    
+    totals = [(f'Date range from {start_date} to {end_date}. Minimum: {min}, Maximum: {max}, Average: {round(avg, 2)}') for min, max, avg in until_today]
 
-@app.route("/api/v1.0/start_end")
-def start_end():
+    
+    return jsonify(totals)
+
+
+@app.route("/api/v1.0/<start>/<end>")
+def dates(start, end):
     """List the min, max, and average temperatures calculated from the given start date to the given end date."""
-    return (
-        f"Available Routes:<br/>5" )
+    session = Session(engine)
+    
+    end_date = start_date = dt.datetime.strptime(end, '%Y-%m-%d').date()
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d').date()
+    
+    date_range = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= start_date).\
+        filter(Measurement.date <= end_date).all()
+    
+    session.close()
+    
+    totals2 = [(f'Date range from {start_date} to {end_date}. Minimum: {min}, Maximum: {max}, Average: {round(avg, 2)}') for min, max, avg in date_range]
+
+    
+    return jsonify(totals2)
 
 
 
